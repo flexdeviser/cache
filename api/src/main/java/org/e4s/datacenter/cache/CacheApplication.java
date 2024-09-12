@@ -54,7 +54,7 @@ public class CacheApplication implements CommandLineRunner {
     private MeterRegistry registry;
 
 
-    @Value("classpath:v4_uuids.txt")
+    @Value("classpath:${spring.profiles.active}_v4_uuids.txt")
     Resource uuids;
 
 

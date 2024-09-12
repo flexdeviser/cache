@@ -14,6 +14,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.avro.reflect.ReflectData;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
@@ -44,7 +45,7 @@ public class App implements CommandLineRunner {
     @Autowired
     private MeterRegistry registry;
 
-    @Value("classpath:v4_uuids.txt")
+    @Value("classpath:${spring.profiles.active}_v4_uuids.txt")
     Resource uuids;
 
     public static void main(String[] args) {
@@ -70,6 +71,10 @@ public class App implements CommandLineRunner {
 
         long loadStart = System.currentTimeMillis();
 
+        AtomicLong totalRecords = new AtomicLong();
+
+        long fetchStart = System.currentTimeMillis();
+
         ids.forEach(id -> {
             runner.submit(fetchViaRest.wrap(() -> {
                 final HttpGet request = new HttpGet("http://localhost:8081/pq/" + id);
@@ -87,6 +92,7 @@ public class App implements CommandLineRunner {
 
                             while ((pq = reader.read()) != null) {
                                 LOG.debug("PQ: {}", pq);
+                                totalRecords.getAndAdd(1);
                             }
                             reader.close();
                             writeLatch.countDown();
@@ -107,12 +113,14 @@ public class App implements CommandLineRunner {
 
         writeLatch.await();
 
-        LOG.info("Loading finished, COUNT: {}, TOTAL-Time: {} s, MAX: {} s, AVG: {} s, Duration: {} s",
+        LOG.info("Loading finished, COUNT: {}, TOTAL-Time: {} s, MAX: {} s, AVG: {} s, Duration: {} s, throughput: {}",
                  fetchViaRest.count(),
                  fetchViaRest.totalTime(
                      TimeUnit.SECONDS), fetchViaRest.max(TimeUnit.SECONDS),
                  fetchViaRest.mean(TimeUnit.SECONDS), Duration.of(System.currentTimeMillis() - loadStart,
-                                                                  ChronoUnit.MILLIS).toSeconds());
+                                                                  ChronoUnit.MILLIS).toSeconds(),
+                 totalRecords.get() / Duration.of(System.currentTimeMillis() - fetchStart, ChronoUnit.MILLIS)
+                     .toSeconds());
 
 
     }
