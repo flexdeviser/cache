@@ -79,19 +79,21 @@ public class App implements CommandLineRunner {
                     final byte[] parquet = IOUtils.toByteArray(resp.getEntity().getContent());
 
                     try {
-                        ParquetReader<PQ> reader = AvroParquetReader.<PQ>builder(new ParquetBufferReader(parquet))
-                            .withCompatibility(false).withDataModel(new ReflectData(PQ.class.getClassLoader()))
-                            .withConf(new Configuration()).build();
-                        PQ pq;
+                        if (parquet != null) {
+                            ParquetReader<PQ> reader = AvroParquetReader.<PQ>builder(new ParquetBufferReader(parquet))
+                                .withCompatibility(false).withDataModel(new ReflectData(PQ.class.getClassLoader()))
+                                .withConf(new Configuration()).build();
+                            PQ pq;
 
-                        while ((pq = reader.read()) != null) {
-                            LOG.debug("PQ: {}", pq);
-                        }
-                        reader.close();
-                        writeLatch.countDown();
+                            while ((pq = reader.read()) != null) {
+                                LOG.debug("PQ: {}", pq);
+                            }
+                            reader.close();
+                            writeLatch.countDown();
 
-                        if (writeLatch.getCount() % 1000 == 0) {
-                            LOG.info("{} remains", writeLatch.getCount());
+                            if (writeLatch.getCount() % 1000 == 0) {
+                                LOG.info("{} remains", writeLatch.getCount());
+                            }
                         }
 
                     } catch (Exception e) {
@@ -110,7 +112,7 @@ public class App implements CommandLineRunner {
                  fetchViaRest.totalTime(
                      TimeUnit.SECONDS), fetchViaRest.max(TimeUnit.SECONDS),
                  fetchViaRest.mean(TimeUnit.SECONDS), Duration.of(System.currentTimeMillis() - loadStart,
-                                                                              ChronoUnit.MILLIS).toSeconds());
+                                                                  ChronoUnit.MILLIS).toSeconds());
 
 
     }
