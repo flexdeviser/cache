@@ -97,7 +97,7 @@ public class CacheApplication implements CommandLineRunner {
         final float max = 255;
         final float min = 100;
 
-        IntStream.range(0, ids.size() - 1).forEachOrdered(num -> {
+        IntStream.range(0, ids.size()).forEachOrdered(num -> {
 
             UUID id = UUID.fromString(ids.get(num));
             runner.submit(compressionDurationTimer.wrap(() -> {
