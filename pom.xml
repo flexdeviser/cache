@@ -36,6 +36,7 @@
   </scm>
   <properties>
     <java.version>17</java.version>
+    <arrow.version>17.0.0</arrow.version>
   </properties>
   <dependencies>
     <dependency>
@@ -123,6 +124,30 @@
       <groupId>io.micrometer</groupId>
       <artifactId>micrometer-registry-jmx</artifactId>
     </dependency>
+
+    <!-- https://mvnrepository.com/artifact/org.apache.arrow/arrow-dataset -->
+    <dependency>
+      <groupId>org.apache.arrow</groupId>
+      <artifactId>arrow-dataset</artifactId>
+      <version>${arrow.version}</version>
+    </dependency>
+
+    <!-- https://mvnrepository.com/artifact/org.apache.arrow/arrow-vector -->
+    <dependency>
+      <groupId>org.apache.arrow</groupId>
+      <artifactId>arrow-vector</artifactId>
+      <version>${arrow.version}</version>
+    </dependency>
+
+    <!-- https://mvnrepository.com/artifact/org.apache.arrow/arrow-memory-netty -->
+    <dependency>
+      <groupId>org.apache.arrow</groupId>
+      <artifactId>arrow-memory-netty</artifactId>
+      <version>${arrow.version}</version>
+      <scope>runtime</scope>
+    </dependency>
+
+
 
     <dependency>
       <groupId>org.springframework.boot</groupId>

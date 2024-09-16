@@ -5,6 +5,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -35,6 +36,17 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.core.io.Resource;
+import org.apache.arrow.dataset.file.FileFormat;
+import org.apache.arrow.dataset.file.FileSystemDatasetFactory;
+import org.apache.arrow.dataset.jni.NativeMemoryPool;
+import org.apache.arrow.dataset.scanner.ScanOptions;
+import org.apache.arrow.dataset.scanner.Scanner;
+import org.apache.arrow.dataset.source.Dataset;
+import org.apache.arrow.dataset.source.DatasetFactory;
+import org.apache.arrow.memory.BufferAllocator;
+import org.apache.arrow.memory.RootAllocator;
+import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.ipc.ArrowReader;
 
 @SpringBootApplication
 public class App implements CommandLineRunner {
@@ -55,6 +67,42 @@ public class App implements CommandLineRunner {
     @Override
     public void run(String... args) throws Exception {
 
+
+        callFile();
+
+    }
+
+    private void callFile(){
+
+        URI uri = URI.create("file:///tmp/c4bd525a-2dba-4945-8284-d788790ecb9c.parquet");
+
+        ScanOptions options = new ScanOptions(/*batchSize*/ 32768);
+        try (
+                BufferAllocator allocator = new RootAllocator();
+                DatasetFactory datasetFactory = new FileSystemDatasetFactory(allocator, NativeMemoryPool.getDefault(), FileFormat.PARQUET, uri.toString());
+                Dataset dataset = datasetFactory.finish();
+                Scanner scanner = dataset.newScan(options);
+                ArrowReader reader = scanner.scanBatches()
+        ) {
+            int totalBatchSize = 0;
+            int count = 1;
+            while (reader.loadNextBatch()) {
+                try (VectorSchemaRoot root = reader.getVectorSchemaRoot()) {
+                    totalBatchSize += root.getRowCount();
+                    System.out.println("Number of rows per batch["+ count++ +"]: " + root.getRowCount());
+                    System.out.print(root.contentToTSVString());
+                }
+            }
+            System.out.println("Total batch size: " + totalBatchSize);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+    }
+
+
+
+    private void callAPI() throws IOException, InterruptedException {
         Timer fetchViaRest = registry.timer("fetch", "parquet", "duration");
 
         PoolingHttpClientConnectionManager poolingConnManager = new PoolingHttpClientConnectionManager();
@@ -65,7 +113,7 @@ public class App implements CommandLineRunner {
         final CloseableHttpClient client = HttpClients.custom().setConnectionManager(poolingConnManager).build();
 
         ExecutorService runner = Executors.newFixedThreadPool(5, new ThreadFactoryBuilder().setNameFormat(
-            "client-data-request-%d").build());
+                "client-data-request-%d").build());
         List<String> ids = Files.readAllLines(Path.of(uuids.getURI()));
         CountDownLatch writeLatch = new CountDownLatch(ids.size());
 
@@ -86,8 +134,8 @@ public class App implements CommandLineRunner {
                     try {
                         if (parquet != null) {
                             ParquetReader<PQ> reader = AvroParquetReader.<PQ>builder(new ParquetBufferReader(parquet))
-                                .withCompatibility(false).withDataModel(new ReflectData(PQ.class.getClassLoader()))
-                                .withConf(new Configuration()).build();
+                                    .withCompatibility(false).withDataModel(new ReflectData(PQ.class.getClassLoader()))
+                                    .withConf(new Configuration()).build();
                             PQ pq;
 
                             while ((pq = reader.read()) != null) {
@@ -113,15 +161,15 @@ public class App implements CommandLineRunner {
 
         writeLatch.await();
 
-        LOG.info("Loading finished, COUNT: {}, TOTAL-Time: {} s, MAX: {} s, AVG: {} s, Duration: {} s, throughput: {}",
-                 fetchViaRest.count(),
-                 fetchViaRest.totalTime(
-                     TimeUnit.SECONDS), fetchViaRest.max(TimeUnit.SECONDS),
-                 fetchViaRest.mean(TimeUnit.SECONDS), Duration.of(System.currentTimeMillis() - loadStart,
-                                                                  ChronoUnit.MILLIS).toSeconds(),
-                 totalRecords.get() / Duration.of(System.currentTimeMillis() - fetchStart, ChronoUnit.MILLIS)
-                     .toSeconds());
-
-
+        LOG.info("Loading finished, COUNT: {}, TOTAL-Time: {} sec, MAX: {} sec, AVG: {} sec, Duration: {} sec, throughput: {}/s",
+                fetchViaRest.count(),
+                fetchViaRest.totalTime(
+                        TimeUnit.SECONDS), fetchViaRest.max(TimeUnit.SECONDS),
+                fetchViaRest.mean(TimeUnit.SECONDS), Duration.of(System.currentTimeMillis() - loadStart,
+                        ChronoUnit.MILLIS).toSeconds(),
+                totalRecords.get() / Duration.of(System.currentTimeMillis() - fetchStart, ChronoUnit.MILLIS)
+                        .toSeconds());
     }
+
+
 }

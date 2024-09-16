@@ -10,6 +10,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import jakarta.annotation.PreDestroy;
 import java.io.ByteArrayOutputStream;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -26,6 +27,8 @@ import org.apache.avro.reflect.ReflectData;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.parquet.avro.AvroParquetWriter;
 import org.apache.parquet.hadoop.ParquetWriter;
+import org.apache.parquet.io.LocalOutputFile;
+import org.apache.parquet.io.OutputFile;
 import org.e4s.model.PQ;
 import org.e4s.service.parquet.ParquetBufferWriter;
 import org.slf4j.Logger;
@@ -105,14 +108,27 @@ public class CacheApplication implements CommandLineRunner {
 
                     keys.add(id);
 
-                    final ByteArrayOutputStream out = new ByteArrayOutputStream();
-                    ParquetWriter<PQ> parquetWriter = AvroParquetWriter.<PQ>builder(new ParquetBufferWriter(out))
-                        .withSchema(ReflectData.AllowNull.get().getSchema(PQ.class))
-                        .withDataModel(ReflectData.get())
-                        .withConf(new Configuration())
-                        .withCompressionCodec(LZ4_RAW)
-                        .withWriteMode(OVERWRITE)
-                        .build();
+//                    final ByteArrayOutputStream out = new ByteArrayOutputStream();
+//                    ParquetWriter<PQ> parquetWriter = AvroParquetWriter.<PQ>builder(new ParquetBufferWriter(out))
+//                        .withSchema(ReflectData.AllowNull.get().getSchema(PQ.class))
+//                        .withDataModel(ReflectData.get())
+//                        .withConf(new Configuration())
+//                        .withCompressionCodec(LZ4_RAW)
+//                        .withWriteMode(OVERWRITE)
+//                        .build();
+
+
+                    final OutputFile parquetFile = new LocalOutputFile(Path.of(URI.create("file:///tmp/" + id.toString() +".parquet")));
+
+                    ParquetWriter<PQ> parquetFileWriter = AvroParquetWriter.<PQ>builder(parquetFile)
+                            .withSchema(ReflectData.AllowNull.get().getSchema(PQ.class))
+                            .withDataModel(ReflectData.get())
+                            .withConf(new Configuration())
+                            .withCompressionCodec(LZ4_RAW)
+                            .withWriteMode(OVERWRITE)
+                            .build();
+
+
 
                     for (int i = 0; i < 6048; i++) {
 
@@ -131,13 +147,15 @@ public class CacheApplication implements CommandLineRunner {
                         pq.setInactivePowerC(min + r.nextFloat() * (max - min));
                         pq.setHistogram(new int[]{0, 1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0});
 
-                        parquetWriter.write(pq);
+//                        parquetWriter.write(pq);
+                        parquetFileWriter.write(pq);
                     }
 
-                    parquetWriter.close();
+//                    parquetWriter.close();
+                    parquetFileWriter.close();
                     // put data onto IMap
-                    pqCache.put(id, out.toByteArray());
-                    out.close();
+//                    pqCache.put(id, out.toByteArray());
+//                    out.close();
                     writeLatch.countDown();
                     if (writeLatch.getCount() % 1000 == 0) {
                         LOG.info("{} remains", writeLatch.getCount());
